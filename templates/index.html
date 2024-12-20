@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chatbot</title>
+</head>
+<body>
+    <h1>Voice Chatbot</h1>
+    <button id="record-btn">🎙️ Record</button>
+    <p id="user-text">You: <span></span></p>
+    <p id="bot-text">Bot: <span></span></p>
+    <audio id="bot-audio" controls></audio>
+
+    <script>
+        const recordBtn = document.getElementById("record-btn");
+        const userTextSpan = document.getElementById("user-text").querySelector("span");
+        const botTextSpan = document.getElementById("bot-text").querySelector("span");
+        const botAudio = document.getElementById("bot-audio");
+
+        let isRecording = false;
+        let recorder, audioChunks;
+
+        // Record audio
+        recordBtn.addEventListener("click", () => {
+            if (isRecording) {
+                recorder.stop();
+                recordBtn.textContent = "🎙️ Record";
+                isRecording = false;
+            } else {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        recorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        recorder.ondataavailable = event => audioChunks.push(event.data);
+                        recorder.onstop = () => {
+                            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                            const formData = new FormData();
+                            formData.append("audio", audioBlob);
+
+                            fetch("/stt", { method: "POST", body: formData })
+                                .then(response => response.json())
+                                .then(data => {
+                                    const userText = data.text;
+                                    userTextSpan.textContent = userText;
+
+                                    fetch("/chat", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ text: userText })
+                                    })
+                                    .then(response => response.json())
+                                    .then(chatData => {
+                                        const botResponse = chatData.response;
+                                        botTextSpan.textContent = botResponse;
+
+                                        fetch("/tts", {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ text: botResponse })
+                                        })
+                                        .then(response => response.json())
+                                        .then(ttsData => {
+                                            botAudio.src = ttsData.audio_url;
+                                            botAudio.play();
+                                        });
+                                    });
+                                });
+                        };
+                        recorder.start();
+                        recordBtn.textContent = "🛑 Stop";
+                        isRecording = true;
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

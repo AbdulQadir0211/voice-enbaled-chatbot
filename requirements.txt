@@ -1,0 +1,10 @@
+transformers
+datasets
+torch
+flask
+speechrecognition
+pyttsx3
+gtts
+playsound
+PyAudio
+streamlit
